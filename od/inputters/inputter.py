@@ -12,6 +12,35 @@ LCCC_URL = "https://coai-dataset.oss-cn-beijing.aliyuncs.com/CleanWB.zip"
 SPECIAL_TOKENS = ["[CLS]", "[SEP]", "[speaker1]", "[speaker2]"]
 
 
+def strs_reshaped(strs):
+  return list(map(lambda s: "".join(list(map(lambda c: c + " ", s.replace(" ", ""))))[:-1], strs))
+
+
+def clean_knowledge(value):
+  if "Information" in value:
+    value.remove("Information")
+  if len(value) > 1 and len(value[1]) < 10:
+    value.insert(0, value[0] + " " + value[1])
+    del value[1:3]
+  return strs_reshaped(value)
+
+
+from more_itertools import flatten
+
+
+def reshape(dataset):
+  return list(flatten(map(lambda x: list(
+    list(map(clean_knowledge, x["knowledge"])) + [strs_reshaped(x["conversation"])] if "conversation" in x else []), dataset)))
+
+
+def reshape2(dataset):
+  return list(flatten(map(lambda x: [[x["history"], x["response"]], x["knowledge"]], dataset)))
+
+
+def reshape3(dataset):
+  return list(flatten(map(lambda x: list(map(clean_knowledge, x["knowledge"])), dataset)))
+
+
 def get_data(tokenizer, dataset_path, dataset_cache, logger):
     """ Get tokenized dataset from COTK or cache."""
     dataset_path = dataset_path or LCCC_URL
@@ -22,10 +51,25 @@ def get_data(tokenizer, dataset_path, dataset_cache, logger):
         samples = None
     else:
         logger.info("Download dataset from %s", dataset_path)
-        cache_file = cached_path(dataset_path)
-        with open(cache_file, "r", encoding="utf-8") as f:
-            dataset = json.loads(f.read())
-            samples = [{k: v[:5]} for k, v in dataset.items()]
+        # cache_file = cached_path(dataset_path)
+        kdconv_train = open("data/input/kdconv/train.txt")
+        kdconv_valid = open("data/input/kdconv/dev.txt")
+        kd_objs_train = [json.loads(line) for line in kdconv_train.readlines()]
+        kd_objs_valid = [json.loads(line) for line in kdconv_valid.readlines()]
+        duconv_train = open("data/input/duconv/train.txt")
+        duconv_valid = open("data/input/duconv/dev.txt")
+        du_objs_train = [json.loads(line) for line in duconv_train.readlines()]
+        du_objs_valid = [json.loads(line) for line in duconv_valid.readlines()]
+        tencent_train = open("data/input/tencent/train.txt", errors="ignore")
+        tencent_valid = open("data/input/tencent/dev.txt", errors="ignore")
+        tencent_objs_train = [json.loads(line) for line in tencent_train.readlines()]
+        tencent_objs_valid = [json.loads(line) for line in tencent_valid.readlines()]
+
+        dataset = {
+            "train": reshape(kd_objs_train),
+            "valid": reshape(kd_objs_valid)
+        }
+        samples = None
 
         logger.info("Tokenize and encode the dataset")
 

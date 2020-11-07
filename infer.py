@@ -17,6 +17,8 @@ import torch.nn.functional as F
 
 from transformers import OpenAIGPTLMHeadModel, GPT2LMHeadModel, BertTokenizer
 
+from od.inputters.inputter import reshape3
+
 SPECIAL_TOKENS = ["[CLS]", "[SEP]", "[PAD]", "[speaker1]", "[speaker2]"]
 
 
@@ -72,11 +74,13 @@ def build_input_from_segments(history, reply, tokenizer, with_eos=True):
 
 
 def test_data(args):
-    with open(args.datapath, "r", encoding="utf-8") as f:
-        dataset = json.loads(f.read())
-    if isinstance(dataset, dict):
-        dataset = dataset["test"]
-    return dataset
+    kdconv_test = open("data/input/kdconv/test.txt")
+    kd_objs_test = [json.loads(line) for line in kdconv_test.readlines()]
+    duconv_test = open("data/input/duconv/test.txt")
+    du_objs_test = [json.loads(line) for line in duconv_test.readlines()]
+    tencent_test = open("data/input/tencent/test.txt", errors="ignore")
+    tencent_objs_test = [json.loads(line) for line in tencent_test.readlines()]
+    return reshape3(kd_objs_test) # + du_objs_test + tencent_objs_test
 
 
 def sample_sequence(history, tokenizer, model, args, current_output=None):
@@ -86,8 +90,8 @@ def sample_sequence(history, tokenizer, model, args, current_output=None):
 
     for i in range(args.max_length):
         instance, sequence = build_input_from_segments(history, current_output, tokenizer, with_eos=False)
-        input_ids = torch.tensor(instance["input_ids"], dtype=torch.long, device=args.device).unsqueeze(0)
-        token_type_ids = torch.tensor(instance["token_type_ids"], dtype=torch.long, device=args.device).unsqueeze(0)
+        input_ids = torch.tensor(instance["input_ids"][:512], dtype=torch.long, device=args.device).unsqueeze(0)
+        token_type_ids = torch.tensor(instance["token_type_ids"][:512], dtype=torch.long, device=args.device).unsqueeze(0)
 
         logits, *_ = model(input_ids, token_type_ids=token_type_ids)
         logits = logits[0, -1, :] / args.temperature
@@ -157,7 +161,7 @@ def main():
 
     predictions = []
     for instance in tqdm(dataset, mininterval=1):
-        history = tokenize(instance[:-1])
+        history = tokenize(instance)
         with torch.no_grad():
             out_ids = sample_sequence(history, tokenizer, model, args)
         out_text = tokenizer.decode(out_ids, skip_special_tokens=True)

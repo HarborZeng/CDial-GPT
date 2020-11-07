@@ -52,13 +52,13 @@ class WBDataset(Dataset):
 
     def collate(self, batch):
         input_ids = pad_sequence(
-            [torch.tensor(instance["input_ids"], dtype=torch.long) for instance in batch],
+            [torch.tensor(instance["input_ids"][:512], dtype=torch.long) for instance in batch],
             batch_first=self.batch_first, padding_value=self.pad)
         token_type_ids = pad_sequence(
-            [torch.tensor(instance["token_type_ids"], dtype=torch.long) for instance in batch],
+            [torch.tensor(instance["token_type_ids"][:512], dtype=torch.long) for instance in batch],
             batch_first=self.batch_first, padding_value=self.pad)
         labels = pad_sequence(
-            [torch.tensor(instance["lm_labels"], dtype=torch.long) for instance in batch],
+            [torch.tensor(instance["lm_labels"][:512], dtype=torch.long) for instance in batch],
             batch_first=self.batch_first, padding_value=-1)
         return input_ids, token_type_ids, labels
 
